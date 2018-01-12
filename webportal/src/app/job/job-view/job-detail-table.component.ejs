@@ -21,7 +21,7 @@
   </tr>
   <tr>
     <th class="text-right">Status</th>
-    <td class="text-left"><%= convertState(jobStatus.state, jobStatus.appExitType) %></td>
+    <td class="text-left"><%= convertState(jobStatus.state) %></td>
   </tr>
   <tr>
     <th class="text-right">TrackingUrl</th>
@@ -47,7 +47,11 @@
 
 <div class="collapse" id="appExitDiagnostics">
   <div class="well">
-    <%= jobStatus.appExitDiagnostics.replace(/\n/g, "<br>") %>
+    <% if (jobStatus.appExitDiagnostics) { %>
+      <%= jobStatus.appExitDiagnostics.replace(/\n/g, "<br>") %>
+    <% } else { %>
+      Not available yet.
+    <% } %>
   </div>
 </div>
 
