@@ -140,6 +140,43 @@ const convertGpu = (gpuAttribute) => {
   }
 };
 
+const convertJobSummaryInfoToRowData = (jobSummaryInfo, idx) => {
+  const jobName = jobSummaryInfo.name;
+  const vcName = (jobSummaryInfo.virtualCluster) ? jobSummaryInfo.virtualCluster : 'default';
+  // Hao's comment: This is just for debugging.
+  const stopBtnStyle = '<button class="btn btn-default btn-sm" onclick="stopJob(\'' +
+    jobName + '\', ' + idx + ')">Stop</button>';
+  //const stopBtnStyle = (data[i].executionType === 'STOP' || data[i].subState === 'FRAMEWORK_COMPLETED') ? '<button class="btn btn-default btn-sm" disabled>Stop</button>' : '<button class="btn btn-default btn-sm" onclick="stopJob(\'' + data[i].name + '\')">Stop</button>';
+  const rowData = {
+    jobName: '<a href="view.html?jobName=' + jobName + '">' + jobName + '</a>',
+    userName: jobSummaryInfo.username,
+    vcName: '<a href="virtual-clusters.html?vcName=' + vcName + '">' + vcName + '</a>',
+    startTime: '<span title="' + Math.round(jobSummaryInfo.createdTime / 1000) + '"/>' +
+      convertTime(false, jobSummaryInfo.createdTime),
+    duration: '<span title="' + getDurationInSeconds(jobSummaryInfo.createdTime, jobSummaryInfo.completedTime) + '"/>' +
+      convertTime(true, jobSummaryInfo.createdTime, jobSummaryInfo.completedTime),
+    retries: jobSummaryInfo.retries,
+    status: convertState(jobSummaryInfo.state),
+    stop: stopBtnStyle,
+  }
+  return rowData;
+};
+
+const convertJobDetailInfoToJobSummaryInfo = (jobDetailInfo) => {
+  return {
+    name: jobDetailInfo.name,
+    username: jobDetailInfo.jobStatus.username,
+    state: jobDetailInfo.jobStatus.state,
+    subState: jobDetailInfo.jobStatus.subState,
+    executionType: jobDetailInfo.jobStatus.executionType,
+    retries: jobDetailInfo.jobStatus.retries,
+    createdTime: jobDetailInfo.jobStatus.createdTime,
+    completedTime: jobDetailInfo.jobStatus.completedTime,
+    appExitCode: jobDetailInfo.jobStatus.appExitCode,
+    virtualCluster: jobDetailInfo.jobStatus.virtualCluster,
+  };
+};
+
 const loadJobs = (limit, specifiedVc) => {
   loading.showLoading();
   $.ajax({
@@ -156,25 +193,13 @@ const loadJobs = (limit, specifiedVc) => {
           if (specifiedVc && vcName !== specifiedVc) {
             continue;
           }
-          let stopBtnStyle = (data[i].executionType === 'STOP' || data[i].subState === 'FRAMEWORK_COMPLETED') ? '<button class="btn btn-default btn-sm" disabled>Stop</button>' : '<button class="btn btn-default btn-sm" onclick="stopJob(\'' + data[i].name + '\')">Stop</button>';
-          displayDataSet.push({
-            jobName: '<a href="view.html?jobName=' + data[i].name + '">' + data[i].name + '</a>',
-            userName: data[i].username,
-            vcName: '<a href="virtual-clusters.html?vcName=' + vcName + '">' + vcName + '</a>',
-            startTime: '<span title="' + Math.round(data[i].createdTime / 1000) + '"/>' +
-              convertTime(false, data[i].createdTime),
-            duration: '<span title="' + getDurationInSeconds(data[i].createdTime, data[i].completedTime) + '"/>' +
-              convertTime(true, data[i].createdTime, data[i].completedTime),
-            retries: data[i].retries,
-            status: convertState(data[i].state),
-            stop: stopBtnStyle,
-          });
+          displayDataSet.push(convertJobSummaryInfoToRowData(data[i], i));
         }
         $('#view-table').html(jobTableComponent({}));
         table = $('#job-table').dataTable({
           'data': displayDataSet,
           'columns': [
-            {title: 'Job', data: 'jobName'},
+            {title: 'Name', data: 'jobName'},
             {title: 'User', data: 'userName'},
             {title: 'Virtual Cluster', data: 'vcName'},
             {title: 'Start Time', data: 'startTime'},
@@ -203,11 +228,17 @@ const loadJobs = (limit, specifiedVc) => {
   });
 };
 
-const stopJob = (jobName) => {
-  const res = confirm('Are you sure to stop the job?');
-  if (res) {
-    userAuth.checkToken((token) => {
+const stopJob = (jobName, idx) => {
+  // Hao's comment: This is just for debugging.
+  //userAuth.checkToken((token) => {
+  //const res = confirm('Are you sure to stop the job?');
+  //if (res) {
+  //  userAuth.checkToken((token) => {
       $.ajax({
+        // Hao's comment: This is just for debugging.
+        url: `${webportalConfig.restServerUri}/api/v1/jobs/${jobName}`,
+        type: 'GET',
+        /*
         url: `${webportalConfig.restServerUri}/api/v1/jobs/${jobName}/executionType`,
         type: 'PUT',
         data: {
@@ -216,16 +247,33 @@ const stopJob = (jobName) => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        */
         success: (data) => {
-          loadJobs();
+          $.ajax({
+            url: `${webportalConfig.restServerUri}/api/v1/jobs/${jobName}`,
+            type: 'GET',
+            success: (data) => {
+              table.row(idx).data(
+                convertJobSummaryInfoToRowData(
+                  convertJobDetailInfoToJobSummaryInfo(data), idx
+                )
+              ).draw();
+              //alert(JSON.stringify(data));
+            },
+            error: (xhr, textStatus, error) => {
+              const res = JSON.parse(xhr.responseText);
+              alert(res.message);
+            },
+          });
         },
         error: (xhr, textStatus, error) => {
           const res = JSON.parse(xhr.responseText);
           alert(res.message);
         },
       });
-    });
-  }
+  // Hao's comment: This is just for debugging.
+  //  });
+  //}
 };
 
 const loadJobDetail = (jobName) => {
