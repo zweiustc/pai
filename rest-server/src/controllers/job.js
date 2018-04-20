@@ -18,40 +18,51 @@
 // module dependencies
 const Job = require('../models/job');
 const logger = require('../config/logger');
+const rateLimit = require('function-rate-limit');
+
+var rateLimitFunctions = {};
 
 /**
  * Load job and append to req.
  */
 const load = (req, res, next, jobName) => {
-  new Job(jobName, (job, error) => {
-    if (error) {
-      if (error.message === 'JobNotFound') {
-        if (req.method !== 'PUT') {
-          logger.warn('load job %s error, could not find job', jobName);
-          return res.status(404).json({
-            error: 'JobNotFound',
-            message: `could not find job ${jobName}`,
-          });
+  console.log('rate limit => ' + jobName);
+  if (!rateLimitFunctions[jobName]) {
+    console.log('create rate limiter for ' + jobName);
+    const f = rateLimit(10000, 10000, function(req, res, next, jobName) {
+      new Job(jobName, (job, error) => {
+        if (error) {
+          if (error.message === 'JobNotFound') {
+            if (req.method !== 'PUT') {
+              logger.warn('load job %s error, could not find job', jobName);
+              return res.status(404).json({
+                error: 'JobNotFound',
+                message: `could not find job ${jobName}`,
+              });
+            }
+          } else {
+            logger.warn('internal server error');
+            return res.status(500).json({
+              error: 'InternalServerError',
+              message: 'internal server error',
+            });
+          }
+        } else {
+          if (job.jobStatus.state !== 'JOB_NOT_FOUND' && req.method === 'PUT' && req.path === `/${jobName}`) {
+            logger.warn('duplicate job %s', jobName);
+            return res.status(400).json({
+              error: 'DuplicateJobSubmission',
+              message: `job already exists: '${jobName}'`,
+            });
+          }
         }
-      } else {
-        logger.warn('internal server error');
-        return res.status(500).json({
-          error: 'InternalServerError',
-          message: 'internal server error',
-        });
-      }
-    } else {
-      if (job.jobStatus.state !== 'JOB_NOT_FOUND' && req.method === 'PUT' && req.path === `/${jobName}`) {
-        logger.warn('duplicate job %s', jobName);
-        return res.status(400).json({
-          error: 'DuplicateJobSubmission',
-          message: `job already exists: '${jobName}'`,
-        });
-      }
-    }
-    req.job = job;
-    return next();
-  });
+        req.job = job;
+        return next();
+      });
+    });
+    rateLimitFunctions[jobName] = f;
+  }
+  rateLimitFunctions[jobName](req, res, next, jobName);
 };
 
 const init = (req, res, next) => {

@@ -18,6 +18,7 @@
 
 // module dependencies
 const express = require('express');
+const RateLimit = require('express-rate-limit');
 const tokenConfig = require('../config/token');
 const jobConfig = require('../config/job');
 const jobController = require('../controllers/job');
@@ -35,7 +36,13 @@ router.route('/')
 
 router.route('/:jobName')
     /** GET /api/v1/jobs/:jobName - Get job status */
-    .get(jobController.get)
+    .get(new RateLimit({
+        windowMs: 10 * 1000, // 1 hour window
+        delayAfter: 1, // begin slowing down responses after the first request
+        delayMs: 1 * 1000, // slow down subsequent responses by 1 seconds per request
+        max: 3, // start blocking after 3 requests
+        message: 'Too many calls from this IP, please try again after a while',
+      }), jobController.get)
 
     /** PUT /api/v1/jobs/:jobName - Update job */
     .put(tokenConfig.check, param.validate(jobConfig.schema), jobController.update)
