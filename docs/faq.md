@@ -19,11 +19,12 @@ A: By default, a VC can use up all cluster resource if others don’t use it. Op
 ### Q: To ensure one user cannot occupy excessive resource, operator would like to set a quota constraint for individual users. 
 
 A: OpenPAI use capacity scheduler of YARN for resource allocation. User can configure the item "[yarn.scheduler.capacity.root.{{ queueName }}.minimum-user-limit-percent](https://hadoop.apache.org/docs/r1.2.1/capacity_scheduler.html)" to control the user's resource quota. This configuration item is in this file [capacity-scheduler.xml.template](../pai-management/bootstrap/hadoop-resource-manager/hadoop-resource-manager-configuration/capacity-scheduler.xml.template) of OpenPAI.
-configuration positions:
+
 ```xml
 <property>
     <name>yarn.scheduler.capacity.root.{{ queueName }}.minimum-user-limit-percent</name>
     <value>100</value>
 </property>
 ```
+
 Default value of 100 implies no user limits are imposed.
